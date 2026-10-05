@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Calendario de Exámenes - Alumnado de Bachillerato</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Fira Sans"', 'sans-serif'] },
+                    colors: { 
+                        corp: { 
+                            green: '#b4be00', 
+                            lightgreen: '#cfd150',
+                            blue: '#009abb', 
+                            darkblue: '#007a94' 
+                        } 
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/lucide@1.52.0/dist/umd/lucide.min.js"></script>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#009abb">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Exámenes Alumnos">
+    <meta name="application-name" content="Exámenes Alumnos">
+    <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <style>
+        html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+        body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); -webkit-tap-highlight-color: transparent; }
+        button, a, select, input, textarea { touch-action: manipulation; }
+
+        .modal-card { max-height: 92vh; max-height: 92dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+        .agenda-card { text-align: left; }
+        .agenda-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+        /* Móvil / tablet vertical: la rejilla de 7 columnas se sustituye por una agenda en lista */
+        @media (max-width: 767px) {
+            .nav-btn { padding: 0.65rem !important; }
+        }
+        @media (max-width: 639px) {
+            #toast-container { left: 1rem; right: 1rem; bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
+            .toast { max-width: none; }
+            .modal-wrap { align-items: flex-end !important; padding: 0 !important; }
+            .modal-card { max-width: none !important; border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; border-top-left-radius: 1rem !important; border-top-right-radius: 1rem !important; padding: 1.25rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom)) !important; }
+            /* 16px evita el zoom automático de iOS al enfocar un campo */
+            .modal-card input, .modal-card select, .modal-card textarea { font-size: 16px !important; min-height: 44px; }
+            .modal-card button { min-height: 40px; }
+            #class-filters button, #itinerary-filters button, #print-class-filters button, #print-itinerary-filters button { min-height: 36px; }
+        }
+        @media (display-mode: standalone) {
+            #install-btn { display: none !important; }
+        }
+
+        #toast-container { position: fixed; bottom: 1rem; right: 1rem; z-index: 100; display: flex; flex-direction: column; gap: 0.5rem; }
+        .toast { padding: 0.75rem 1rem; border-radius: 0.5rem; font-size: 0.8rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,.15); max-width: 320px; }
+        .toast-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .toast-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+
+        #print-view { display: none; }
+
+        @media print {
+            @page { size: A4 landscape; margin: 1cm; }
+            html, body { height: 100%; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print, #app-view, #toast-container { display: none !important; }
+            #print-view { display: block !important; }
+
+            /* El folio (A4 landscape) menos los márgenes del @page: 29.7cm x 21cm - 2cm = 27.7cm x 19cm */
+            .print-page { width: 27.7cm; height: 19cm; display: flex; flex-direction: column; gap: 0.25cm; page-break-after: avoid; overflow: hidden; }
+
+            .print-header { flex: 0 0 auto; display: flex; align-items: center; gap: 0.5cm; border-bottom: 2px solid #009abb; padding-bottom: 0.2cm; }
+            .print-header svg { height: 1.5cm; width: auto; flex-shrink: 0; }
+            .print-header-school { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: #b4be00 !important; }
+            .print-header-title { font-size: 16px; font-weight: 700; color: #009abb !important; }
+            .print-header-filter { margin-left: auto; font-size: 11px; font-weight: 600; color: #475569 !important; text-align: right; }
+
+            .print-weekday-row { flex: 0 0 auto; display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid #cbd5e1; }
+            .print-weeks { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+            .print-week-grid { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: repeat(7, 1fr); border-left: 1px solid #cbd5e1; border-right: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; }
+
+            .print-week-header, .print-day-cell { border-right: 1px solid #cbd5e1; }
+            .print-week-header:last-child, .print-day-cell:last-child { border-right: none; }
+            .print-week-header { background: #f1f5f9 !important; text-align: center; font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 3px 0; color: #475569 !important; }
+            .print-day-cell { padding: 2px; display: flex; flex-direction: column; gap: 1px; min-height: 0; overflow: hidden; }
+            .print-day-number { font-size: 9px; font-weight: 700; color: #94a3b8 !important; text-align: right; flex-shrink: 0; }
+            .print-exam-card { border: 1px solid; border-radius: 3px; padding: 1px 3px; font-size: 7.5px; line-height: 1.15; overflow: hidden; flex-shrink: 0; }
+            .print-exam-subject { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .print-exam-meta { opacity: .8; font-size: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .print-exam-more { font-size: 7px; font-weight: 700; color: #64748b !important; flex-shrink: 0; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
+
+    <div id="toast-container"></div>
+
+    <div id="app-view">
+    <div id="offline-banner" class="hidden no-print bg-amber-100 border-b border-amber-300 text-amber-900 text-xs font-semibold px-4 py-2 text-center"></div>
+    <!-- HEADER CON LOGO SVG VECTORIAL Y ESTILOS CORPORATIVOS -->
+    <header class="bg-white border-b border-slate-200 shadow-sm md:sticky md:top-0 z-40">
+        <div class="w-full bg-white py-2 md:py-4 px-4 flex justify-center border-b border-slate-100">
+            <svg id="Capa_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="158 636 676 232" class="w-full max-h-14 sm:max-h-20 md:max-h-32 h-auto">
+              <defs>
+                <style>
+                  .st0 { fill: #b4be00; }
+                  .st1 { fill: #cfd150; }
+                  .st2 { fill: #009abb; }
+                  .st3 { fill: #dedd83; }
+                </style>
+              </defs>
+              <path class="st0" d="M278.2,785.9c0,11.9,5.7,17.8,17.2,17.8s3.4,0,4.4-.2v-11.7c-.7.1-1.7.2-3,.2-2.9,0-4.2-2.2-4.2-6.5v-58.5h-14.5v59h0Z"/>
+              <path class="st0" d="M259.1,766.7c0-11.5-9.3-14.7-13-14.7-16.4,0-25.9,10.1-25.9,28.6s7.6,23.8,19.1,23.8,11.9-3.1,15.2-9.3c.3,2.4.7,5.2,1.3,8.2h13.5c-.7-3.7-1.1-11.8-1.1-24.2v-13.5c-3.9,4.6-9.1,8-15.2,9.5-1.7,14-5.8,17-10,17s-8.4-4.1-8.4-12.5,4.8-17.7,12.8-17.7,11.9,1.6,11.9,4.6"/>
+              <path class="st0" d="M335.9,773h-18.2c.8-6.9,4.2-10.2,10.2-10.2s8,4,8,10.2M349.6,782.3v-6c0-15.7-7.6-24.3-21.4-24.3s-23.9,8.3-23.9,24.8,2.6,15.8,7.8,20.6c5.2,4.8,11.9,7.1,20.2,7.1s11.5-1,16.1-2.7v-11.8c-5.7,1.6-11.1,2.4-16.2,2.4-7.8,0-12.5-3.4-14-10h31.4,0Z"/>
+              <path class="st0" d="M369.9,766.8c0-2.4,2.1-3.6,6.4-3.6s8.1.5,11.3,1.6v-11.1c-3.5-1.2-7.7-1.7-12.5-1.7-13.1,0-18.7,4.5-18.7,14.2s.8,7.9,2.6,10.1c1.8,2.2,5.1,4.3,9.8,6.4,6,2.8,7.6,4.3,7.6,6.4s-3.5,4.1-8,4.1-8.1-.7-12.8-2.2v11.2c3.9,1.4,8.9,2.1,15.1,2.1,12.9,0,19.3-5.2,19.3-15.5s-.8-8-3.3-10.4c-2.4-2.4-3.8-3.2-7.9-5.3-6.9-3.8-9.1-4.2-9.1-6.4"/>
+              <path class="st0" d="M397.6,785.9c0,11.9,5.7,17.8,17.2,17.8s3.4,0,4.4-.2v-11.7c-.7.1-1.7.2-3,.2-2.9,0-4.2-2.2-4.2-6.5v-33.1h-14.5v33.5h0Z"/>
+              <path class="st0" d="M457.4,763.9c-.5,23.9-5.6,28.4-10.8,28.4s-8.4-4.1-8.4-12.5,4.8-16.5,12.8-16.5,4.1.2,6.4.5M473,803.4c-.7-3.7-1.1-11.8-1.1-24.2v-23.6c-2.5-1.2-5.9-2-10.2-2.6-4.2-.6-8.1-1-11.8-1-16.5,0-25.9,10.1-25.9,28.6s7.6,23.8,19.1,23.8,11.9-3.1,15.2-9.3c.3,2.4.7,5.2,1.3,8.2h13.5,0Z"/>
+              <path class="st0" d="M577.1,763.9c-.5,23.9-5.6,28.4-10.8,28.4s-8.4-4.1-8.4-12.5,4.8-16.5,12.8-16.5,4.1.2,6.4.5M592.6,803.4c-.7-3.7-1.1-11.8-1.1-24.2v-23.6c-2.5-1.2-5.9-2-10.2-2.6-4.2-.6-8.1-1-11.8-1-16.5,0-25.9,10.1-25.9,28.6s7.6,23.8,19.1,23.8,11.9-3.1,15.2-9.3c.3,2.4.7,5.2,1.3,8.2h13.5,0Z"/>
+              <path class="st0" d="M614,766.8c0-2.4,2.1-3.6,6.4-3.6s8.1.5,11.3,1.6v-11.1c-3.5-1.2-7.7-1.7-12.5-1.7-13.1,0-18.7,4.5-18.7,14.2s.8,7.9,2.6,10.1c1.8,2.2,5.1,4.3,9.8,6.4,6,2.8,7.6,4.3,7.6,6.4s-3.5,4.1-8,4.1-8.1-.7-12.8-2.2v11.2c3.9,1.4,8.9,2.1,15.1,2.1,12.9,0,19.3-5.2,19.3-15.5s-.8-8-3.3-10.4c-2.4-2.4-3.8-3.2-7.9-5.3-6.8-3.8-9.1-4.2-9.1-6.4"/>
+              <path class="st3" d="M261.2,726.4s-15.6,1.9-23.5-3.4c-10.5-7.1-18.5-7.6-20.5-4-2.8,5,1.3,12.5,9.8,13.6,8.5,1.1,14.4.2,20.9-1.4,5.8-1.4,13.4-4.8,13.4-4.8"/>
+              <path class="st3" d="M274.3,714.6s3.5-11.3,3.5-20.8c0-12.4-4.2-15.8,2.2-19.6,4.9-2.9,11.4,4,11,12.6-.3,8.5-4.4,14.8-8.9,19.8-4.7,5.2-7.9,8-7.9,8"/>
+              <path class="st3" d="M257.8,720.8c6.1,0,11-4.9,11-11s-4.9-11-11-11-11,4.9-11,11,4.9,11,11,11"/>
+              <path class="st0" d="M497.5,802.7c0-10.7.1-22.6,4.2-28.5,4.2-5.9,8.1-6,11.3-6s6.7,3.6,6.7,9.3v31.1l16,3.8v-59.9s-30.5-4.7-38.4,17.6v-13.8l-16.6-3.8v59.9l16.6-3.8v-5.9h0Z"/>
+              <polygon class="st1" points="484.3 757.3 493.4 758.9 493.4 772.6 484.3 772 484.3 757.3"/>
+              <polygon class="st1" points="484.3 792.6 493.4 791.9 493.4 805.7 484.3 807.3 484.3 792.6"/>
+              <polygon class="st1" points="484.3 774.9 493.4 775.4 493.4 789.2 484.3 789.6 484.3 774.9"/>
+              <polygon class="st1" points="532.4 755.9 523.3 757.5 523.3 772.6 532.4 772 532.4 755.9"/>
+              <polygon class="st1" points="532.4 792.6 523.3 791.9 523.3 805.7 532.4 807.3 532.4 792.6"/>
+              <polygon class="st1" points="532.4 774.9 523.3 775.4 523.3 789.2 532.4 789.6 532.4 774.9"/>
+              <path class="st0" d="M190.7,812.2c-6.5,0-12.1-.7-17.2-2.2l-.5-.2v-13.2l.9.2c5.2,1.4,10.7,2.2,16.3,2.2s9.5-1,9.5-7.4-.7-3.4-2.1-4.9c-1.6-1.8-4.6-4.5-9.4-8.5-5.4-4.4-9-8.1-11.1-11.2-2.1-3.3-3.1-7.1-3.1-11.4,0-13.1,7.9-20,22.8-20s10.9.7,15.9,2.1l.5.2v13.1l-1-.4c-3.5-1.3-8.1-2-13.6-2s-9.3.8-9.3,6.4.6,3.4,1.7,4.9c.8,1,3.2,3.3,9.5,8.6,2.8,2.3,4.8,4.1,6,5.2,1.2,1.1,2.5,2.6,4.3,4.8,3.1,3.6,4.3,7.2,4.3,12.5,0,13.6-8.8,21.4-24.2,21.4"/>
+              <path class="st3" d="M556.4,830c-13.8-9.1-30.2-14.5-48-14.5s-34.2,5.3-48,14.5c15.5-3.4,31.5-5.2,48-5.2s32.5,1.8,48,5.2"/>
+              <path class="st2" d="M747.6,651.5c-20.4,0-28.2,12.9-28.7,26.7-.4,13.8,6.1,30.8,29.1,30.8s28.2-15.5,29.1-28.7c.9-11.4-3.5-28.7-29.5-28.7"/>
+              <path class="st2" d="M790.1,723.5c-10.4,0-14.4-6.6-14.6-13.6s3.1-15.7,14.8-15.7,14.4,7.9,14.8,14.6c.4,5.8-1.8,14.6-15,14.6"/>
+              <path class="st2" d="M773,738.7c-8.2.7-19.3,4.8-19.3,14.5s12.2,14,20,16.5l11.5,3.5c13.8,4.1,25.9,9.9,33.6,19.4-.6-16.2-6.2-30.9-15.6-43-5.5-7.1-17.7-11.9-30.2-10.8"/>
+              <path class="st2" d="M706.9,759.1c0-12.3,3.1-23.1,8.6-32-2.5.8-5,1.8-7.5,2.9-9,5-16.9,11.9-23.1,20.1-6.7,10.5-10.8,24.7-10.8,44,0,30.7,13,49.5,31.4,59.3l13.8-26c11.2,9.9,24.6,17.9,40,17.9s21.8-5.3,21.8-17.5-17.7-17-27.3-19.8c-28.2-8-46.8-15.4-46.8-49"/>
+              <g>
+                <path class="st0" d="M470.5,718.8h-2.3l3-17.3h2.6l5,11.5c.4,1.2.7,1.9.7,2.1,0-.5.1-1.4.4-2.8l1.9-10.8h2.4l-3,17.3h-2.6l-5-11.5c-.4-1.1-.7-1.8-.8-2.4,0,.6-.2,1.5-.4,2.5l-2,11.3h0Z"/>
+                <path class="st0" d="M495.5,712.5l-.2,1.1h-8.3c-.1,2.3,1.1,3.4,3.5,3.4s2.6-.2,4.1-.6l-.4,2c-1.2.4-2.5.7-4,.7-4.1,0-6.2-2.2-5.5-6.4.7-3.9,3.1-5.9,6.7-5.9s4.8,2,4.1,5.7h0ZM487.2,711.9h5.9c.3-2-.4-3.2-2.2-3.2s-3.2,1.1-3.8,3.2h0Z"/>
+                <path class="st0" d="M499.1,718.8h-2.5l2.1-11.8h2.4l-.6,4c1.4-2.9,3-4.3,5-4.3s.8,0,1,0l-.4,2.3c-.3,0-.6,0-.9,0-2.5,0-4.8,2.9-5.9,9v.7q-.1,0-.1,0Z"/>
+                <path class="st0" d="M511.5,718.8h-2.6l-2.4-11.8h2.7l1.4,9.3,4.7-9.3h2.7l-6.6,11.8h0Z"/>
+                <path class="st0" d="M519.5,707h2.5l-1.5,8.3c-.2,1.1,0,1.6.8,1.6s.5,0,.7,0l-.4,2c-.4,0-.7,0-.9,0-2.5,0-3.2-1.2-2.8-3.6l1.5-8.3h0ZM520.4,701.5h2.5l-.5,2.6h-2.5l.5-2.6Z"/>
+                <path class="st0" d="M530.5,706.8c3.6,0,5.4,2.1,4.7,6.1-.7,4.2-3.3,6.2-6.9,6.2s-5.4-2-4.7-6.2c.7-4,3.3-6.1,6.8-6.1h0ZM530.2,708.8c-2,0-3.5,1.4-4,4.1s.5,4.2,2.5,4.2,3.5-1.5,4-4.2c.5-2.7-.5-4.1-2.5-4.1h0ZM532.6,701.5h2.8l-3.7,3.9h-1.9l2.9-3.9h0Z"/>
+                <path class="st0" d="M538.9,718.8h-2.5l2.1-11.8h2.4l-.6,3.6c1.4-2.5,3.2-3.8,5.5-3.8s3.1,1.4,2.6,4l-1.4,8h-2.5l1.3-7.2c.3-2,0-2.7-1.1-2.7s-2.4.9-3.4,2.7c-1,1.8-1.7,3.9-2.2,6.2l-.2,1h0Z"/>
+                <path class="st0" d="M558.7,709.7c.3.3.5.8.5,1.3s-.2,1.1-.6,1.6-.9.7-1.5.7-1-.2-1.3-.5c-.3-.3-.5-.8-.5-1.3s.2-1.1.6-1.5.9-.7,1.5-.7,1,.2,1.3.5h0Z"/>
+                <path class="st0" d="M570.7,706.9c.3.4,1.1,1.2,2.4,2.2,1.2,1,2,1.9,2.5,2.7.5.7.6,1.6.4,2.6-.5,3-2.8,4.6-6.4,4.6s-2.9-.2-4.2-.5l.4-2.1c1.3.4,2.7.6,4.2.6,2.1,0,3.3-.8,3.6-2.4,0-.6,0-1.1-.4-1.6s-1.1-1.2-2.2-2.1c-1.3-1.1-2.2-2-2.6-2.7-.5-.8-.6-1.6-.4-2.6.5-2.7,2.5-4.2,6-4.2s2.7.2,3.9.5l-.3,2c-1.2-.3-2.5-.5-3.7-.5-2,0-3.1.7-3.4,2.1,0,.6,0,1.1.3,1.5h0Z"/>
+                <path class="st0" d="M588.4,712.5l-.2,1.1h-8.3c-.1,2.3,1.1,3.4,3.5,3.4s2.6-.2,4.1-.6l-.4,2c-1.2.4-2.5.7-4,.7-4.1,0-6.2-2.2-5.5-6.4.7-3.9,3.1-5.9,6.7-5.9s4.8,2,4.2,5.7h0ZM580.2,711.9h5.9c.3-2-.4-3.2-2.2-3.2s-3.2,1.1-3.8,3.2Z"/>
+                <path class="st0" d="M595.2,718.8h-2.6l-2.4-11.8h2.7l1.4,9.3,4.7-9.3h2.7l-6.6,11.8h0Z"/>
+                <path class="st0" d="M603.2,707h2.5l-1.5,8.3c-.2,1.1,0,1.6.8,1.6s.5,0,.7,0l-.4,2c-.4,0-.7,0-.9,0-2.5,0-3.2-1.2-2.8-3.6l1.5-8.3h0ZM604.1,701.5h2.5l-.5,2.6h-2.5l.5-2.6Z"/>
+                <path class="st0" d="M610.2,700.3h2.5l-2.6,15c-.2,1.1,0,1.6.8,1.6s.5,0,.7,0l-.4,2c-.4,0-.7,0-.9,0-2.5,0-3.2-1.2-2.8-3.6l2.7-15Z"/>
+                <path class="st0" d="M616.1,700.3h2.5l-2.7,15c-.2,1.1,0,1.6.8,1.6s.5,0,.7,0l-.4,2c-.4,0-.7,0-.9,0-2.5,0-3.2-1.2-2.8-3.6l2.7-15h0Z"/>
+                <path class="st0" d="M627.1,718.8c0-1,0-1.8,0-2.5-1.1,1.8-2.7,2.8-4.6,2.8-2.8,0-4.3-1.7-3.6-5.6.8-4.4,3.4-6.7,7.5-6.7s3.5.2,4.7.8v.4c0,0,0,0,0,0l-1,5.7c-.4,2.4-.7,4.1-.6,5.2h-2.4ZM626.1,715.5c.9-1.1,1.7-3.3,2.3-6.6-.7-.2-1.5-.2-2.2-.2-2.5,0-4.1,1.5-4.7,4.6-.4,2.4.2,3.6,2,3.6s1.6-.3,2.5-1.4h0Z"/>
+              </g>
+              <g>
+                <path class="st2" d="M310.2,727.2v1.8h-6v5.5h5v1.8h-5v5.6h6v1.8h-8.1v-16.6h8.1Z"/>
+                <path class="st2" d="M312.8,732.5c.4.5,1.2,1.2,2.4,2.2,1.2,1,2,1.8,2.5,2.6s.8,1.5.8,2.5c0,2.8-1.7,4.3-4.8,4.3s-2.5-.2-3.7-.5v-1.8c1.3.4,2.5.5,3.6.5,1.9,0,2.8-.8,2.8-2.5s-.2-1.1-.6-1.7c-.4-.5-1.1-1.2-2.2-2.1-1.3-1.1-2.2-1.9-2.7-2.7-.5-.7-.8-1.6-.8-2.5,0-2.5,1.5-3.9,4.5-3.9s2.4.2,3.4.5v1.8c-1.1-.4-2.2-.5-3.2-.5-1.8,0-2.6.7-2.6,2.2s.2,1.1.5,1.5h0Z"/>
+                <path class="st2" d="M327,729c-.5-.1-1.2-.2-2.1-.2-2.9,0-4.5,2.1-4.5,5.7s.7,4,2,5.5c1.4,1.5,3.1,2.2,5.1,2.2v1.8c-2.6,0-4.9-.9-6.7-2.7-1.8-1.8-2.7-4.1-2.7-6.9s.6-4.1,1.7-5.5c1.1-1.3,2.8-2,4.9-2s1.7,0,2.2.2v1.8Z"/>
+                <path class="st2" d="M327.6,727.2h2.2v10.4c0,3,1.3,4.5,3.2,4.5s3.2-1.5,3.2-4.5v-10.4h2.2v10.4c0,4.3-2.1,6.4-5.4,6.4s-5.5-2.1-5.5-6.4v-10.4Z"/>
+                <path class="st2" d="M347.9,727.2v1.8h-6v5.5h5v1.8h-5v5.6h6v1.8h-8.1v-16.6h8.1Z"/>
+                <path class="st2" d="M356.7,742v1.8h-8.1v-16.6h2.1v14.8h6.1Z"/>
+                <path class="st2" d="M360.2,727.2h2.6l5,16.6h-2.2l-1.2-4.3h-5.5l-1.2,4.3h-2.2l4.7-16.6h0ZM361,731.4l-1.7,6.3h4.5l-1.8-6.3c0,0-.2-.8-.5-2.2l-.2,1-.3,1.2h0Z"/>
+                <path class="st2" d="M369.7,732.5c.4.5,1.2,1.2,2.4,2.2,1.2,1,2,1.8,2.5,2.6s.8,1.5.8,2.5c0,2.8-1.7,4.3-4.8,4.3s-2.5-.2-3.7-.5v-1.8c1.3.4,2.5.5,3.6.5,1.9,0,2.8-.8,2.8-2.5s-.2-1.1-.6-1.7c-.4-.5-1.1-1.2-2.2-2.1-1.3-1.1-2.2-1.9-2.7-2.7-.5-.7-.8-1.6-.8-2.5,0-2.5,1.5-3.9,4.5-3.9s2.4.2,3.4.5v1.8c-1.1-.4-2.2-.5-3.2-.5-1.8,0-2.6.7-2.6,2.2s.2,1.1.5,1.5h0Z"/>
+                <path class="st2" d="M380.8,732.5c.4.5,1.2,1.2,2.4,2.2,1.2,1,2,1.8,2.5,2.6s.8,1.5.8,2.5c0,2.8-1.7,4.3-4.8,4.3s-2.5-.2-3.7-.5v-1.8c1.3.4,2.5.5,3.6.5,1.9,0,2.8-.8,2.8-2.5s-.2-1.1-.6-1.7c-.4-.5-1.1-1.2-2.2-2.1-1.3-1.1-2.2-1.9-2.7-2.7-.5-.7-.8-1.6-.8-2.5,0-2.5,1.5-3.9,4.5-3.9s2.4.2,3.4.5v1.8c-1.1-.4-2.2-.5-3.2-.5-1.8,0-2.6.7-2.6,2.2s.2,1.1.5,1.5h0Z"/>
+                <path class="st2" d="M390.4,727.2h2.6l5,16.6h-2.2l-1.2-4.3h-5.5l-1.2,4.3h-2.2l4.7-16.6h0ZM391.2,731.4l-1.7,6.3h4.5l-1.8-6.3c0,0-.2-.8-.5-2.2l-.2,1-.3,1.2h0Z"/>
+                <path class="st2" d="M406.1,742v1.8h-8.1v-16.6h2.1v14.8h6.1Z"/>
+                <path class="st2" d="M414.3,727.2v1.8h-6v5.5h5v1.8h-5v5.6h6v1.8h-8.1v-16.6h8.1Z"/>
+                <path class="st2" d="M416.9,732.5c.4.5,1.2,1.2,2.4,2.2,1.2,1,2,1.8,2.5,2.6s.8,1.5.8,2.5c0,2.8-1.7,4.3-4.8,4.3s-2.5-.2-3.7-.5v-1.8c1.3.4,2.5.5,3.6.5,1.9,0,2.8-.8,2.8-2.5s-.2-1.1-.6-1.7c-.4-.5-1.1-1.2-2.2-2.1-1.3-1.1-2.2-1.9-2.7-2.7-.5-.7-.8-1.6-.8-2.5,0-2.5,1.5-3.9,4.5-3.9s2.4.2,3.4.5v1.8c-1.1-.4-2.2-.5-3.2-.5-1.8,0-2.6.7-2.6,2.2s.2,1.1.5,1.5h0Z"/>
+                <path class="st2" d="M425.2,743.8h-2.1v-16.6h2.1v16.6Z"/>
+                <path class="st2" d="M430,727.2h2.6l5,16.6h-2.2l-1.2-4.3h-5.5l-1.2,4.3h-2.2l4.7-16.6h0ZM430.8,731.4l-1.7,6.3h4.5l-1.8-6.3c0,0-.2-.8-.5-2.2l-.2,1-.3,1.2h0Z"/>
+                <path class="st2" d="M439.5,743.8h-1.9v-16.6h2.2l6.2,11.5c.5.9.8,1.6,1,2,0-.5-.1-1.4-.1-2.8v-10.7h1.9v16.6h-2.2l-6.1-11.4c-.6-1.1-.9-1.9-1-2.2,0,.7.1,1.5.1,2.4v11.3h0Z"/>
+                <path class="st2" d="M453.5,727.2h2.6l5,16.6h-2.2l-1.2-4.3h-5.5l-1.2,4.3h-2.2l4.7-16.6h0ZM454.3,731.4l-1.7,6.3h4.5l-1.8-6.3c0,0-.2-.8-.5-2.2l-.2,1-.3,1.2h0Z"/>
+                <path class="st2" d="M463,732.5c.4.5,1.2,1.2,2.4,2.2,1.2,1,2,1.8,2.5,2.6s.8,1.5.8,2.5c0,2.8-1.7,4.3-4.8,4.3s-2.5-.2-3.7-.5v-1.8c1.3.4,2.5.5,3.6.5,1.9,0,2.8-.8,2.8-2.5s-.2-1.1-.6-1.7c-.4-.5-1.1-1.2-2.2-2.1-1.3-1.1-2.2-1.9-2.7-2.7-.5-.7-.8-1.6-.8-2.5,0-2.5,1.5-3.9,4.5-3.9s2.4.2,3.4.5v1.8c-1.1-.4-2.2-.5-3.2-.5-1.8,0-2.6.7-2.6,2.2s.2,1.1.5,1.5h0Z"/>
+                <path class="st2" d="M480.2,743.8h-1.8l-3.1-9.6c-.4-1.1-.7-2.2-1-3.4v.8c0,.4,0,.7,0,.9,0,.5,0,1.1,0,1.8l-.4,9.5h-2l.8-16.6h2.1l4.6,14,4.6-14h2.1l.8,16.6h-2l-.4-9.5c0-.3,0-.8,0-1.5s0-1.7,0-2.1c-.3,1.1-.7,2.3-1,3.4l-3.1,9.6Z"/>
+                <path class="st2" d="M491.2,727.2h2.6l5,16.6h-2.2l-1.2-4.3h-5.5l-1.2,4.3h-2.2l4.7-16.6h0ZM492,731.4l-1.7,6.3h4.5l-1.8-6.3c0,0-.2-.8-.5-2.2l-.2,1-.3,1.2h0Z"/>
+                <path class="st2" d="M501.3,743.8h-2.1v-14.8h-1.5v-1.8h2.7c2.7,0,4.6.5,5.8,1.5,1.2,1,1.8,2.2,1.8,3.8,0,2.2-.9,3.9-2.8,4.9l3.4,6.4h-2.3l-2.9-5.6c-.7.2-1.4.3-2.1.3v5.3h0ZM501.3,729v7.8c2.9-.2,4.5-1.8,4.5-4.2s-1.5-3.4-4.5-3.6Z"/>
+                <path class="st2" d="M511,743.8h-2.1v-16.6h2.1v16.6ZM511.2,722.1h2.3l-2.6,3.7h-1.6l1.9-3.7h0Z"/>
+                <path class="st2" d="M516.2,727.2h2.6l5,16.6h-2.2l-1.2-4.3h-5.5l-1.2,4.3h-2.2l4.7-16.6h0ZM517,731.4l-1.7,6.3h4.5l-1.8-6.3c0,0-.2-.8-.5-2.2l-.2,1-.3,1.2h0Z"/>
+                <path class="st2" d="M530.2,727.2h2.6l5,16.6h-2.2l-1.2-4.3h-5.5l-1.2,4.3h-2.2l4.7-16.6h0ZM531,731.4l-1.7,6.3h4.5l-1.8-6.3c0,0-.2-.8-.5-2.2l-.2,1-.3,1.2h0Z"/>
+                <path class="st2" d="M537.5,727.2h2.2v10.4c0,3,1.3,4.5,3.2,4.5s3.2-1.5,3.2-4.5v-10.4h2.2v10.4c0,4.3-2.1,6.4-5.4,6.4s-5.5-2.1-5.5-6.4v-10.4Z"/>
+                <path class="st2" d="M548.4,727.2h2.2l3.3,6.4,3.3-6.4h2.2l-4.4,7.9,4.8,8.7h-2.2l-3.7-7-3.7,7h-2.2l4.8-8.7-4.4-7.9h0Z"/>
+                <path class="st2" d="M561.8,743.8h-2.1v-16.6h2.1v16.6Z"/>
+                <path class="st2" d="M571.4,742v1.8h-8.1v-16.6h2.1v14.8h6Z"/>
+                <path class="st2" d="M573.6,743.8h-2.1v-16.6h2.1v16.6Z"/>
+                <path class="st2" d="M578.4,727.2h2.6l5,16.6h-2.2l-1.2-4.3h-5.5l-1.2,4.3h-2.2l4.7-16.6h0ZM579.2,731.4l-1.7,6.3h4.5l-1.8-6.3c0,0-.2-.8-.5-2.2l-.2,1-.3,1.2h0Z"/>
+                <path class="st2" d="M586.5,743.8v-14.8h-1.6v-1.8h2.9c6.2,0,9.3,2.4,9.3,7.2s-.8,5-2.6,6.7-4,2.6-7,2.6h-1.1,0ZM588.6,729v13c1.8,0,3.4-.7,4.5-2.1,1.2-1.5,1.8-3.2,1.8-5.3,0-3.6-1.8-5.3-6.3-5.5h0Z"/>
+                <path class="st2" d="M603.4,727c2,0,3.5.7,4.6,2.2,1.2,1.5,1.7,3.6,1.7,6.3s-.6,4.9-1.7,6.3c-1.1,1.5-2.7,2.2-4.6,2.2s-3.5-.7-4.7-2.2c-1.1-1.5-1.7-3.6-1.7-6.3s.6-4.9,1.7-6.3c1.2-1.5,2.7-2.2,4.7-2.2ZM607.5,735.5c0-4.3-1.6-6.7-4.2-6.7s-4.2,2.4-4.2,6.7,1.6,6.7,4.2,6.7,4.2-2.4,4.2-6.7Z"/>
+                <path class="st2" d="M613,743.8h-2.1v-14.8h-1.5v-1.8h2.7c2.7,0,4.6.5,5.8,1.5,1.2,1,1.8,2.2,1.8,3.8,0,2.2-.9,3.9-2.8,4.9l3.4,6.4h-2.3l-2.9-5.6c-.7.2-1.4.3-2.1.3v5.3h0ZM613,729v7.8c2.9-.2,4.5-1.8,4.5-4.2s-1.5-3.4-4.5-3.6Z"/>
+                <path class="st2" d="M624,727.2h2.6l5,16.6h-2.2l-1.2-4.3h-5.5l-1.2,4.3h-2.2l4.7-16.6h0ZM624.8,731.4l-1.7,6.3h4.5l-1.8-6.3c0,0-.2-.8-.5-2.2l-.2,1-.3,1.2h0Z"/>
+              </g>
+            </svg>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div>
+                <span class="block text-xs uppercase tracking-widest font-bold text-corp-green">Bachillerato · Alumnado</span>
+                <h1 class="text-xl font-bold text-corp-blue">Calendario de Exámenes</h1>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-3 sm:px-4 pt-4 md:pt-6 pb-8 md:pb-6 space-y-4 md:space-y-6">
+
+        <!-- FILTROS DE VISUALIZACIÓN INTERACTIVOS -->
+        <section class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4 no-print">
+            <div>
+                <label class="block text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">1. Filtrar por Clase</label>
+                <div class="flex flex-wrap gap-2" id="class-filters"></div>
+            </div>
+            <div id="itinerary-filter-container" class="border-t border-slate-100 pt-3 hidden">
+                <label class="block text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">2. Filtrar por Itinerario</label>
+                <div class="flex flex-wrap gap-2" id="itinerary-filters"></div>
+            </div>
+        </section>
+
+        <!-- NAVEGACIÓN DE MES Y ACCIONES -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div class="flex items-center justify-between w-full sm:w-auto gap-3">
+                <button onclick="changeMonth(-1)" aria-label="Mes anterior" class="nav-btn p-2 hover:bg-slate-100 rounded-lg text-slate-600 no-print">
+                    <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                </button>
+                <h2 id="current-month-display" class="text-lg font-bold text-slate-800 min-w-[140px] text-center capitalize"></h2>
+                <button onclick="changeMonth(1)" aria-label="Mes siguiente" class="nav-btn p-2 hover:bg-slate-100 rounded-lg text-slate-600 no-print">
+                    <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-center sm:justify-end gap-2 w-full sm:w-auto">
+                <button id="install-btn" onclick="installApp()" class="hidden no-print bg-corp-green/20 hover:bg-corp-green/30 text-slate-800 border border-corp-green px-3 py-2.5 sm:py-2 rounded-lg text-xs font-semibold items-center gap-1.5">
+                    <i data-lucide="download" class="w-4 h-4"></i> Instalar app
+                </button>
+                <button onclick="fetchExams()" title="Vuelve a cargar los exámenes desde el servidor (útil si has tenido la página abierta mucho rato, ya que la web no se actualiza sola en tiempo real)" class="no-print flex-1 sm:flex-none justify-center bg-blue-50 hover:bg-blue-100 text-corp-blue border border-sky-200 px-3 py-2.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i> Actualizar
+                </button>
+                <button onclick="openPrintModal()" class="no-print flex-1 sm:flex-none justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-300">
+                    <i data-lucide="printer" class="w-4 h-4"></i> Imprimir
+                </button>
+            </div>
+        </div>
+
+        <!-- REJILLA DEL CALENDARIO -->
+        <div class="hidden md:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="grid grid-cols-7 bg-slate-50 border-b border-slate-200 text-center font-semibold text-xs text-slate-600 py-2.5 uppercase">
+                <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div class="text-slate-400">Sáb</div><div class="text-slate-400">Dom</div>
+            </div>
+            <div id="calendar-grid" class="grid grid-cols-7 divide-x divide-y divide-slate-200 bg-slate-200"></div>
+        </div>
+
+        <!-- AGENDA EN LISTA (móvil y tablet vertical) -->
+        <div id="calendar-agenda" class="md:hidden space-y-3 no-print"></div>
+
+
+        <!-- SUSCRIPCIÓN A LOS 4 CALENDARIOS DE BACHILLERATO -->
+        <section class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm no-print space-y-3">
+            <div class="flex items-center gap-2 text-corp-blue">
+                <i data-lucide="bell" class="w-5 h-5 text-corp-green"></i>
+                <h2 class="text-sm font-bold uppercase tracking-wider">Recibe los exámenes en tu calendario (Google / Apple / Outlook)</h2>
+            </div>
+            <p class="text-xs text-slate-500">Elige tu clase y suscríbete: "Google" añade el calendario a tu cuenta de Google; "iCal" sirve para Apple Calendar (iPhone/iPad) y Outlook.</p>
+
+            <div id="calendar-subscribe-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-1"></div>
+
+            <p class="text-[11px] text-slate-400 pt-1">Con "Google" se abre Google Calendar para añadir el calendario de tu clase; con "iCal", el iPhone/iPad (o Outlook) te preguntará si quieres suscribirte. Los exámenes nuevos que ponga el profesorado aparecerán solos en tu calendario.</p>
+        </section>
+
+    </main>
+    </div>
+
+    <!-- VISTA EXCLUSIVA PARA IMPRESIÓN (generada por JS antes de imprimir) -->
+    <div id="print-view"></div>
+
+    <!-- MODAL DE OPCIONES DE IMPRESIÓN -->
+    <div id="print-modal" class="modal-wrap fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden no-print">
+        <div class="modal-card bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-lg font-bold text-slate-800">¿Qué quieres imprimir?</h3>
+                <button onclick="closePrintModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">1. Clase</label>
+                <div class="flex flex-wrap gap-2" id="print-class-filters"></div>
+            </div>
+            <div id="print-itinerary-filter-container" class="border-t border-slate-100 pt-3 hidden">
+                <label class="block text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">2. Itinerario</label>
+                <div class="flex flex-wrap gap-2" id="print-itinerary-filters"></div>
+            </div>
+
+            <div class="flex flex-col gap-2 pt-3 border-t">
+                <button onclick="triggerPrint()" class="bg-corp-blue hover:bg-corp-darkblue text-white font-medium px-4 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5">
+                    <i data-lucide="printer" class="w-4 h-4"></i> Imprimir
+                </button>
+                <p class="text-[11px] text-slate-400">Se ajusta a un folio A4 apaisado con el logo y el filtro elegido. En el diálogo de impresión del navegador puedes elegir una impresora o "Guardar como PDF".</p>
+                <button type="button" onclick="closePrintModal()" class="self-end px-3 py-1.5 border rounded-lg text-xs mt-1">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FICHA DE DETALLE DE UN EXAMEN (solo lectura) -->
+    <div id="detail-modal" class="modal-wrap fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden no-print" onclick="if (event.target === this) closeDetail()">
+        <div class="modal-card bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-lg font-bold text-slate-800">Detalle del examen</h3>
+                <button onclick="closeDetail()" aria-label="Cerrar" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="detail-body" class="space-y-3 text-sm"></div>
+            <div class="flex justify-end pt-1">
+                <button type="button" onclick="closeDetail()" class="px-4 py-1.5 border rounded-lg text-xs font-semibold">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbxT0BbgNZDVep0SXRINgpK1WQffJWSOUPnFIIUINETAFRmKF9jwgde8BEy_F7xfpkgv/exec";
+
+        const CLASS_ITINERARIES = {
+            "1º Bach A": ["Humanidades y Ciencias Sociales (Todos)", "Desdoble"],
+            "1º Bach B": ["Ciencias y Tecnología (Todos)", "Ciencias", "Tecnología"],
+            "2º Bach A": ["Humanidades y Ciencias Sociales (Todos)", "Desdoble"],
+            "2º Bach B": ["Ciencias y Tecnología (Todos)", "Ciencias", "Tecnología"]
+        };
+
+        // Solo los colores con los que se pinta cada profesor/a (los mismos que en la web del profesorado).
+        const TEACHER_DATA = {
+            "Rocío Cano González": { color: "bg-red-100 border-red-300 text-red-900" },
+            "Amalia Campos García": { color: "bg-blue-100 border-blue-300 text-blue-900" },
+            "Ana Felipe Casas": { color: "bg-sky-100 border-sky-300 text-sky-900" },
+            "Elena Martínez Leiva": { color: "bg-emerald-100 border-emerald-300 text-emerald-900" },
+            "Margarita Luque Blanco": { color: "bg-purple-100 border-purple-300 text-purple-900" },
+            "Nuria González Ganfornina": { color: "bg-indigo-100 border-indigo-300 text-indigo-900" },
+            "Graziella Rodríguez Macías": { color: "bg-pink-100 border-pink-300 text-pink-900" },
+            "Paco Morales Domínguez": { color: "bg-amber-100 border-amber-300 text-amber-900" },
+            "Pablo Bermejo González": { color: "bg-orange-100 border-orange-300 text-orange-900" },
+            "Mario Espejo Palacios": { color: "bg-yellow-100 border-yellow-300 text-yellow-900" },
+            "Mª Ángeles Chávez Ramos": { color: "bg-teal-100 border-teal-300 text-teal-900" },
+            "Pepa Laguna Ortíz": { color: "bg-rose-100 border-rose-300 text-rose-900" },
+            "Carlos Sánchez Cabrera": { color: "bg-cyan-100 border-cyan-300 text-cyan-900" },
+            "Isabel Cortés Moreno": { color: "bg-lime-100 border-lime-300 text-lime-900" },
+            "Ana María Gallardo Pinto": { color: "bg-emerald-200 border-emerald-400 text-emerald-950" }
+        };
+
+        // IDs reales de los 4 calendarios de Google (uno por clase).
+        const CALENDAR_IDS = {
+            "1º Bach A": "c_8c3993fe0d844b4f3fa5d8a18a30ee96242c3576bfc158c11aeb2fa67bd2586a@group.calendar.google.com",
+            "1º Bach B": "c_de47733cf4131f0de112e04f086f1a58dcc94387743806a10291ad9c5dae4c1e@group.calendar.google.com",
+            "2º Bach A": "c_f156f263656cdc96ad68d5212bbc1a1d4485f52bc70c7a3bca53dd7545f73934@group.calendar.google.com",
+            "2º Bach B": "c_44edb9cfb0a13ebac79e26eea7f910afe300725fea3722bc415c10c33e377572@group.calendar.google.com"
+        };
+
+        let exams = [];
+        let selectedClassFilter = "ALL";
+        let selectedItineraryFilter = "ALL";
+        const today = new Date();
+        let currentDate = new Date(today.getFullYear(), today.getMonth(), 1);
+
+        const EXAMS_CACHE_KEY = "examenes-alumnos-cache-v1";
+        const FILTERS_KEY = "examenes-alumnos-filtros-v1";
+
+        // Se recuerda la clase/itinerario elegidos para no tener que volver a filtrar cada vez.
+        function restoreSavedFilters() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(FILTERS_KEY) || "null");
+                if (!saved || !CLASS_ITINERARIES[saved.cls]) return;
+                selectedClassFilter = saved.cls;
+                if (saved.itin && CLASS_ITINERARIES[saved.cls].includes(saved.itin)) selectedItineraryFilter = saved.itin;
+            } catch (e) {}
+        }
+
+        function saveFilters() {
+            try { localStorage.setItem(FILTERS_KEY, JSON.stringify({ cls: selectedClassFilter, itin: selectedItineraryFilter })); } catch (e) {}
+        }
+        let examsLoaded = false;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            restoreSavedFilters();
+            renderClassFilters();
+            renderCalendarSubscribeList();
+
+            // Se pinta al instante lo último guardado en el dispositivo y se refresca desde el servidor.
+            const cached = loadExamsCache();
+            if (cached) { exams = cached.exams; examsLoaded = true; }
+            renderCalendar();
+            fetchExams();
+
+            lucide.createIcons();
+            registerServiceWorker();
+            window.addEventListener("offline", () => showOfflineBanner());
+            window.addEventListener("online", () => { hideOfflineBanner(); fetchExams(); });
+            if (!navigator.onLine) showOfflineBanner();
+        });
+
+        function showToast(message, type = "error", ms = 5000) {
+            const container = document.getElementById("toast-container");
+            const el = document.createElement("div");
+            el.className = `toast ${type === "error" ? "toast-error" : "toast-success"}`;
+            el.textContent = message;
+            container.appendChild(el);
+            setTimeout(() => el.remove(), ms);
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+        }
+
+        // ---------------------------------------------------------------
+        // MODO SIN CONEXIÓN (datos guardados en el dispositivo)
+        // ---------------------------------------------------------------
+        function loadExamsCache() {
+            try {
+                const raw = localStorage.getItem(EXAMS_CACHE_KEY);
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed.exams) ? parsed : null;
+            } catch (e) { return null; }
+        }
+
+        function saveExamsCache() {
+            try { localStorage.setItem(EXAMS_CACHE_KEY, JSON.stringify({ ts: Date.now(), exams })); } catch (e) {}
+        }
+
+        function showOfflineBanner() {
+            const el = document.getElementById("offline-banner");
+            const cached = loadExamsCache();
+            if (cached) {
+                const when = new Date(cached.ts).toLocaleString("es", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+                el.textContent = `Sin conexión: se muestran los últimos exámenes guardados en este dispositivo (${when}).`;
+            } else {
+                el.textContent = "Sin conexión: no se pueden cargar los exámenes todavía.";
+            }
+            el.classList.remove("hidden");
+        }
+
+        function hideOfflineBanner() {
+            document.getElementById("offline-banner").classList.add("hidden");
+        }
+
+        // ---------------------------------------------------------------
+        // INSTALAR COMO APP (PWA)
+        // ---------------------------------------------------------------
+        let deferredInstallPrompt = null;
+
+        function isStandalone() {
+            return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+        }
+
+        function isIOS() {
+            return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+        }
+
+        function setInstallButtonVisible(visible) {
+            const btn = document.getElementById("install-btn");
+            btn.classList.toggle("hidden", !visible);
+            btn.classList.toggle("flex", visible);
+        }
+
+        function setupInstallPrompt() {
+            if (isStandalone()) return;
+            window.addEventListener("beforeinstallprompt", (ev) => {
+                ev.preventDefault();
+                deferredInstallPrompt = ev;
+                setInstallButtonVisible(true);
+            });
+            window.addEventListener("appinstalled", () => {
+                deferredInstallPrompt = null;
+                setInstallButtonVisible(false);
+            });
+            if (isIOS()) setInstallButtonVisible(true);
+        }
+
+        async function installApp() {
+            if (deferredInstallPrompt) {
+                deferredInstallPrompt.prompt();
+                try { await deferredInstallPrompt.userChoice; } catch (e) {}
+                deferredInstallPrompt = null;
+                setInstallButtonVisible(false);
+                return;
+            }
+            showToast('Para instalar la app: pulsa el botón Compartir del navegador y elige "Añadir a pantalla de inicio".', "success", 9000);
+        }
+
+        setupInstallPrompt();
+
+        function renderCalendarSubscribeList() {
+            const container = document.getElementById("calendar-subscribe-list");
+            const dotColors = { "1º Bach A": "bg-corp-green", "1º Bach B": "bg-corp-green", "2º Bach A": "bg-corp-blue", "2º Bach B": "bg-corp-blue" };
+
+            container.innerHTML = Object.keys(CALENDAR_IDS).map(className => {
+                const calId = CALENDAR_IDS[className];
+                const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calId)}`;
+                const icsUrl = `webcal://calendar.google.com/calendar/ical/${encodeURIComponent(calId)}/public/basic.ics`;
+                return `
+                <div class="flex items-center justify-between p-3 rounded-lg border border-slate-200">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full ${dotColors[className]}"></span>
+                        <span class="text-xs font-bold text-slate-700">${className.replace("Bach", "Bachillerato")}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="${googleUrl}" target="_blank" rel="noopener noreferrer" title="Añadir a Google Calendar" class="text-[10px] font-semibold px-2 py-1 rounded border border-slate-200 text-slate-600 hover:border-corp-blue hover:text-corp-blue">Google</a>
+                        <a href="${icsUrl}" title="Suscribirse por iCal (Apple / Outlook)" class="text-[10px] font-semibold px-2 py-1 rounded border border-slate-200 text-slate-600 hover:border-corp-blue hover:text-corp-blue">iCal</a>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function registerServiceWorker() {
+            if ("serviceWorker" in navigator) {
+                navigator.serviceWorker.register("sw.js").catch(() => {});
+            }
+        }
+
+        function renderClassFilters() {
+            const container = document.getElementById("class-filters");
+            const classes = ["ALL", "1º Bach A", "1º Bach B", "2º Bach A", "2º Bach B"];
+            container.innerHTML = classes.map(c => `
+                <button onclick="selectClassFilter('${c}')" class="px-3 py-1 rounded-lg text-xs font-semibold ${selectedClassFilter === c ? 'bg-corp-blue text-white' : 'bg-slate-100 text-slate-600'}">
+                    ${c === 'ALL' ? 'Todas las Clases' : c}
+                </button>
+            `).join('');
+            
+            renderItineraryFilters();
+        }
+
+        function renderItineraryFilters() {
+            const containerContainer = document.getElementById("itinerary-filter-container");
+            const container = document.getElementById("itinerary-filters");
+
+            if (selectedClassFilter === "ALL" || !CLASS_ITINERARIES[selectedClassFilter]) {
+                containerContainer.classList.add("hidden");
+                selectedItineraryFilter = "ALL";
+                return;
+            }
+
+            containerContainer.classList.remove("hidden");
+            const itineraries = ["ALL", ...CLASS_ITINERARIES[selectedClassFilter]];
+
+            container.innerHTML = itineraries.map(i => `
+                <button onclick="selectItineraryFilter('${i}')" class="px-3 py-1 rounded-lg text-xs font-semibold ${selectedItineraryFilter === i ? 'bg-corp-green text-white' : 'bg-slate-100 text-slate-600'}">
+                    ${i === 'ALL' ? 'Todos los Itinerarios' : i}
+                </button>
+            `).join('');
+        }
+
+        function selectClassFilter(c) {
+            selectedClassFilter = c;
+            selectedItineraryFilter = "ALL";
+            saveFilters();
+            renderClassFilters();
+            renderCalendar();
+        }
+
+        function selectItineraryFilter(i) {
+            selectedItineraryFilter = i;
+            saveFilters();
+            renderItineraryFilters();
+            renderCalendar();
+        }
+
+        // ---------------------------------------------------------------
+        // MODAL DE OPCIONES DE IMPRESIÓN
+        // ---------------------------------------------------------------
+        let printClassFilter = "ALL";
+        let printItineraryFilter = "ALL";
+
+        function openPrintModal() {
+            printClassFilter = selectedClassFilter;
+            printItineraryFilter = selectedItineraryFilter;
+            renderPrintClassFilters();
+            document.getElementById("print-modal").classList.remove("hidden");
+            lucide.createIcons();
+        }
+
+        function closePrintModal() {
+            document.getElementById("print-modal").classList.add("hidden");
+        }
+
+        function renderPrintClassFilters() {
+            const container = document.getElementById("print-class-filters");
+            const classes = ["ALL", "1º Bach A", "1º Bach B", "2º Bach A", "2º Bach B"];
+            container.innerHTML = classes.map(c => `
+                <button onclick="selectPrintClassFilter('${c}')" class="px-3 py-1 rounded-lg text-xs font-semibold ${printClassFilter === c ? 'bg-corp-blue text-white' : 'bg-slate-100 text-slate-600'}">
+                    ${c === 'ALL' ? 'Todas las Clases' : c}
+                </button>
+            `).join('');
+
+            renderPrintItineraryFilters();
+        }
+
+        function renderPrintItineraryFilters() {
+            const containerContainer = document.getElementById("print-itinerary-filter-container");
+            const container = document.getElementById("print-itinerary-filters");
+
+            if (printClassFilter === "ALL" || !CLASS_ITINERARIES[printClassFilter]) {
+                containerContainer.classList.add("hidden");
+                printItineraryFilter = "ALL";
+                return;
+            }
+
+            containerContainer.classList.remove("hidden");
+            const itineraries = ["ALL", ...CLASS_ITINERARIES[printClassFilter]];
+
+            container.innerHTML = itineraries.map(i => `
+                <button onclick="selectPrintItineraryFilter('${i}')" class="px-3 py-1 rounded-lg text-xs font-semibold ${printItineraryFilter === i ? 'bg-corp-green text-white' : 'bg-slate-100 text-slate-600'}">
+                    ${i === 'ALL' ? 'Todos los Itinerarios' : i}
+                </button>
+            `).join('');
+        }
+
+        function selectPrintClassFilter(c) {
+            printClassFilter = c;
+            printItineraryFilter = "ALL";
+            renderPrintClassFilters();
+        }
+
+        function selectPrintItineraryFilter(i) {
+            printItineraryFilter = i;
+            renderPrintItineraryFilters();
+        }
+
+        function triggerPrint() {
+            closePrintModal();
+            const prevClass = selectedClassFilter;
+            const prevItinerary = selectedItineraryFilter;
+            selectedClassFilter = printClassFilter;
+            selectedItineraryFilter = printItineraryFilter;
+            printCalendar();
+            selectedClassFilter = prevClass;
+            selectedItineraryFilter = prevItinerary;
+        }
+
+        function normalizeDateStr(rawDate) {
+            if (!rawDate) return "";
+            const str = String(rawDate).trim();
+            if (str.includes("T")) return str.split("T")[0];
+            return str.substring(0, 10);
+        }
+
+        async function fetchExams() {
+            try {
+                const res = await fetch(API_URL);
+                const data = await res.json();
+                const rawExams = Array.isArray(data) ? data : (data.data || data.exams || []);
+                
+                exams = rawExams.map(e => ({
+                    id: e.id || e.ID || Date.now().toString(),
+                    subject: e.subject || e.Subject || e.asignatura || "",
+                    teacher: e.teacher || e.Teacher || e.profesor || "",
+                    className: e.className || e.ClassName || e.clase || "",
+                    itinerary: e.itinerary || e.Itinerary || e.itinerario || "",
+                    date: normalizeDateStr(e.date || e.Date || e.fecha),
+                    content: e.content || e.Content || e.contenido || ""
+                }));
+
+                examsLoaded = true;
+                saveExamsCache();
+                hideOfflineBanner();
+                renderCalendar();
+            } catch(e) {
+                console.error("Error al obtener exámenes:", e);
+                examsLoaded = true;
+                if (loadExamsCache()) {
+                    showOfflineBanner();
+                } else {
+                    showToast("No se pudo conectar con el servidor. Comprueba tu conexión.");
+                }
+                renderCalendar();
+            }
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById("calendar-grid");
+            grid.innerHTML = "";
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            document.getElementById("current-month-display").textContent = `${new Date(year, month).toLocaleString('es', {month: 'long'})} ${year}`;
+
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+            let startingDay = new Date(year, month, 1).getDay() - 1;
+            if (startingDay === -1) startingDay = 6;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            for (let i = 0; i < startingDay; i++) grid.appendChild(document.createElement("div"));
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const cell = document.createElement("div");
+                cell.className = "bg-white min-h-[85px] p-1 flex flex-col gap-1";
+                const dayNumber = dateStr === todayStr
+                    ? `<span class="inline-block bg-corp-blue text-white rounded-full px-1.5 py-px">${day}</span>`
+                    : day;
+                cell.innerHTML = `<div class="text-[10px] font-bold text-slate-400 text-right">${dayNumber}</div>`;
+
+                examsForDay(dateStr).forEach(e => {
+                    const teacherInfo = TEACHER_DATA[e.teacher];
+                    const colorClasses = teacherInfo ? teacherInfo.color : "bg-sky-50 border-sky-200 text-slate-800";
+
+                    const card = document.createElement("div");
+                    card.className = `p-1 border rounded text-xs cursor-pointer hover:shadow-sm transition-all ${colorClasses}`;
+                    card.onclick = () => openDetail(e.id);
+                    card.innerHTML = `
+                        <div class="font-bold truncate">${e.subject}</div>
+                        <div class="text-[9px] opacity-80 truncate">${e.className} (${e.itinerary})</div>
+                        <div class="text-[8px] opacity-70 truncate">${e.teacher || ''}</div>
+                    `;
+                    cell.appendChild(card);
+                });
+                grid.appendChild(cell);
+            }
+
+            renderAgenda(year, month, daysInMonth, todayStr);
+            lucide.createIcons();
+        }
+
+        // Vista en lista del mes (móvil y tablet vertical): solo los días con exámenes.
+        function renderAgenda(year, month, daysInMonth, todayStr) {
+            const agenda = document.getElementById("calendar-agenda");
+            const weekdays = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+            let html = "";
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayExams = examsForDay(dateStr);
+                if (!dayExams.length) continue;
+
+                const isToday = dateStr === todayStr;
+                const cards = dayExams.map(e => {
+                    const teacherInfo = TEACHER_DATA[e.teacher];
+                    const colorClasses = teacherInfo ? teacherInfo.color : "bg-sky-50 border-sky-200 text-slate-800";
+                    return `
+                        <button type="button" data-exam-id="${escapeHtml(e.id)}" class="agenda-card w-full p-3 border rounded-xl shadow-sm ${colorClasses}">
+                            <div class="font-bold text-sm">${escapeHtml(e.subject)}</div>
+                            <div class="text-xs opacity-80 mt-0.5">${escapeHtml(e.className)}${e.itinerary ? " · " + escapeHtml(e.itinerary) : ""}</div>
+                            <div class="text-xs opacity-70">${escapeHtml(e.teacher)}</div>
+                            ${e.content ? `<div class="agenda-clamp text-xs mt-1 opacity-80">${escapeHtml(e.content)}</div>` : ""}
+                        </button>`;
+                }).join("");
+
+                html += `
+                    <div class="flex gap-3">
+                        <div class="w-12 shrink-0 text-center pt-1">
+                            <div class="text-[10px] uppercase font-bold text-slate-400">${weekdays[new Date(year, month, day).getDay()]}</div>
+                            <div class="mx-auto mt-0.5 flex items-center justify-center w-9 h-9 rounded-full text-lg font-bold ${isToday ? "bg-corp-blue text-white" : "text-slate-700"}">${day}</div>
+                        </div>
+                        <div class="flex-1 min-w-0 space-y-2">${cards}</div>
+                    </div>`;
+            }
+
+            if (!html) {
+                const msg = !examsLoaded
+                    ? "Cargando exámenes…"
+                    : "No hay exámenes este mes" + (selectedClassFilter === "ALL" ? "." : " con el filtro seleccionado.");
+                html = `<div class="bg-white border border-slate-200 rounded-xl p-6 text-center text-sm text-slate-500">${msg}</div>`;
+            }
+
+            agenda.innerHTML = html;
+            agenda.onclick = (ev) => {
+                const card = ev.target.closest("[data-exam-id]");
+                if (card) openDetail(card.dataset.examId);
+            };
+        }
+
+        function changeMonth(d) { currentDate.setMonth(currentDate.getMonth() + d); renderCalendar(); }
+
+        // ---------------------------------------------------------------
+        // FICHA DE DETALLE (solo lectura)
+        // ---------------------------------------------------------------
+        function openDetail(id) {
+            const e = exams.find(x => String(x.id) === String(id));
+            if (!e) return;
+            const teacherInfo = TEACHER_DATA[e.teacher];
+            const colorClasses = teacherInfo ? teacherInfo.color : "bg-sky-50 border-sky-200 text-slate-800";
+            const [y, m, d] = normalizeDateStr(e.date).split("-").map(Number);
+            let dateLabel = y ? new Date(y, m - 1, d).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "";
+            dateLabel = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
+
+            const row = (label, value, extra = "") => value ? `
+                <div>
+                    <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">${label}</div>
+                    <div class="text-slate-800 ${extra}">${escapeHtml(value)}</div>
+                </div>` : "";
+
+            document.getElementById("detail-body").innerHTML = `
+                <div class="border rounded-xl p-3 ${colorClasses}"><div class="text-base font-bold">${escapeHtml(e.subject)}</div></div>
+                ${row("Fecha", dateLabel)}
+                ${row("Clase", e.className + (e.itinerary ? " · " + e.itinerary : ""))}
+                ${row("Profesor/a", e.teacher)}
+                ${row("Contenido / temas", e.content, "whitespace-pre-line")}`;
+            document.getElementById("detail-modal").classList.remove("hidden");
+        }
+
+        function closeDetail() { document.getElementById("detail-modal").classList.add("hidden"); }
+
+        document.addEventListener("keydown", (ev) => {
+            if (ev.key === "Escape") { closeDetail(); closePrintModal(); }
+        });
+
+        // ---------------------------------------------------------------
+        // IMPRESIÓN
+        // ---------------------------------------------------------------
+
+        function buildWeeksMatrix(year, month) {
+            let startingDay = new Date(year, month, 1).getDay() - 1;
+            if (startingDay === -1) startingDay = 6;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            const cells = [];
+            for (let i = 0; i < startingDay; i++) cells.push(null);
+            for (let day = 1; day <= daysInMonth; day++) cells.push(day);
+            while (cells.length % 7 !== 0) cells.push(null);
+
+            const weeks = [];
+            for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+            return weeks;
+        }
+
+        function examsForDay(dateStr) {
+            return exams.filter(e => {
+                const eDate = normalizeDateStr(e.date);
+                const matchClass = (selectedClassFilter === "ALL" || e.className === selectedClassFilter);
+                const matchItinerary = (selectedItineraryFilter === "ALL" || e.itinerary === selectedItineraryFilter);
+                return eDate === dateStr && matchClass && matchItinerary;
+            });
+        }
+
+        // Máximo de exámenes que se muestran por celda en la vista de impresión
+        // (cada celda tiene una altura fija, para que la rejilla completa
+        // quepa siempre en un folio: menos semanas en el mes = filas más
+        // altas = caben más exámenes). Si hay más, se indica "+N más".
+        function printMaxExamsPerDay(numWeeks) {
+            if (numWeeks <= 4) return 5;
+            if (numWeeks === 5) return 4;
+            return 3;
+        }
+
+        function renderPrintDayCell(year, month, day, maxPerDay) {
+            if (!day) return `<div class="print-day-cell bg-white"></div>`;
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dayExams = examsForDay(dateStr);
+            const shown = dayExams.slice(0, maxPerDay);
+            const extra = dayExams.length - shown.length;
+            const cards = shown.map(e => {
+                const teacherInfo = TEACHER_DATA[e.teacher];
+                const colorClasses = teacherInfo ? teacherInfo.color : "bg-sky-50 border-sky-200 text-slate-800";
+                const meta = `${e.className}${e.itinerary ? ' (' + e.itinerary + ')' : ''} · ${e.teacher || ''}`;
+                return `<div class="print-exam-card ${colorClasses}">
+                    <div class="print-exam-subject">${e.subject}</div>
+                    <div class="print-exam-meta">${meta}</div>
+                </div>`;
+            }).join('');
+            const more = extra > 0 ? `<div class="print-exam-more">+${extra} más</div>` : '';
+            return `<div class="print-day-cell bg-white"><div class="print-day-number">${day}</div>${cards}${more}</div>`;
+        }
+
+        function renderWeekGrid(year, month, week, maxPerDay) {
+            return `<div class="print-week-grid">${week.map(day => renderPrintDayCell(year, month, day, maxPerDay)).join('')}</div>`;
+        }
+
+        function currentFilterLabel() {
+            let label = selectedClassFilter === "ALL" ? "Todas las clases" : selectedClassFilter;
+            if (selectedItineraryFilter !== "ALL") label += ` — ${selectedItineraryFilter}`;
+            return label;
+        }
+
+        function printCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const monthLabel = `${new Date(year, month).toLocaleString('es', {month: 'long'})} ${year}`;
+            const weeks = buildWeeksMatrix(year, month);
+            const weekdayHeader = `<div class="print-weekday-row">${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d => `<div class="print-week-header">${d}</div>`).join('')}</div>`;
+            // Se quita el atributo class del <svg> (tamaños responsive de pantalla) para que mande el CSS de impresión
+            const logoSvg = document.getElementById("Capa_1").outerHTML.replace(/^<svg([^>]*?)\sclass="[^"]*"/, "<svg$1");
+
+            const pageHeader = `
+                <div class="print-header">
+                    ${logoSvg}
+                    <div>
+                        <div class="print-header-school">Bachillerato — Escuelas Salesianas María Auxiliadora</div>
+                        <div class="print-header-title">Calendario de Exámenes — ${monthLabel}</div>
+                    </div>
+                    <div class="print-header-filter">${currentFilterLabel()}</div>
+                </div>`;
+
+            const maxPerDay = printMaxExamsPerDay(weeks.length);
+            const html = `<div class="print-page">
+                ${pageHeader}
+                ${weekdayHeader}
+                <div class="print-weeks">${weeks.map(w => renderWeekGrid(year, month, w, maxPerDay)).join('')}</div>
+            </div>`;
+
+            document.getElementById("print-view").innerHTML = html;
+            window.print();
+        }
+    </script>
+</body>
+</html>
