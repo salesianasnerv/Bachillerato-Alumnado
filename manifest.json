@@ -1,7 +1,7 @@
 {
   "id": "./index.html",
-  "name": "Calendario de exámenes · Alumnado · Escuelas Salesianas María Auxiliadora",
-  "short_name": "Exámenes Alumnos",
+  "name": "Bachillerato | Escuelas Salesianas María Auxiliadora · Nervión (Sevilla)",
+  "short_name": "Bachillerato",
   "description": "Calendario de exámenes de Bachillerato de las Escuelas Salesianas María Auxiliadora (Nervión, Sevilla) para el alumnado.",
   "start_url": "./index.html",
   "scope": "./",
